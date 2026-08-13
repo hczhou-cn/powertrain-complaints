@@ -1,0 +1,10 @@
+# 数据与产物（勿提交）
+data/
+output/
+logs/
+__pycache__/
+*.pyc
+.DS_Store
+
+# 敏感配置（含飞书 webhook，勿提交）
+config/notify.json
