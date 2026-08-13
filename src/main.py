@@ -20,7 +20,7 @@ from datetime import datetime, timedelta
 from . import config as cfg
 from .classifier import PowertrainClassifier
 from .dashboard import build_dashboard
-from .notifier import FeishuNotifier
+from .notifier import FeishuNotifier, WeComNotifier
 from .report import export_csv, export_excel
 from .sources import SOURCES
 from .storage import fetch_detail, init_db, summary_stats, upsert_complaint
@@ -241,9 +241,12 @@ def main(argv=None) -> int:
     notify_cfg = cfg.get_notify()
     if args.notify:
         notify_cfg["enabled"] = True
+        notify_cfg.setdefault("wecom", {})["enabled"] = True
     if args.no_notify:
         notify_cfg["enabled"] = False
-    notifier = FeishuNotifier(notify_cfg)
+        notify_cfg.setdefault("wecom", {})["enabled"] = False
+    notifiers = [FeishuNotifier(notify_cfg), WeComNotifier(notify_cfg)]
+    notifiers = [n for n in notifiers if n.available(args.dry_run)]
 
     conn = init_db(cfg.resolve_path(settings["paths"]["db"]))
     logger.info("启动: 回溯近 %d 天 | 列表页上限 %d | 全量=%s | 详情页=%s",
@@ -275,11 +278,11 @@ def main(argv=None) -> int:
         build_dashboard(conn, since_date, classifier, dash_path)
         print(f"[完成] 看板: {dash_path}（浏览器打开）")
 
-    if notifier.available(args.dry_run):
-        card = notifier.build_daily_card(stats, since_date, high_risk)
-        notifier.send_card(card, dry_run=args.dry_run)
+    if notifiers:
+        for notifier in notifiers:
+            notifier.send_daily(stats, since_date, high_risk, dry_run=args.dry_run)
     else:
-        logger.info("飞书推送未启用（配置 enabled=false 或未设置 webhook）")
+        logger.info("通知渠道均未启用（enabled=false 或未配置 webhook）")
 
     conn.close()
     return 0
