@@ -3,6 +3,7 @@
 ![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
 ![License](https://img.shields.io/badge/License-MIT-green)
 ![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue)
+![Email](https://img.shields.io/badge/Email-13817447620%40163.com-blue)
 
 自动抓取**车质网**（12365auto.com）中国汽车投诉数据，双通道识别**动力总成（Powertrain）**相关抱怨，结构化入库（SQLite），输出 **CSV + Excel 多 Sheet 报表 + HTML 看板**，支持**飞书 / 企微双渠道日报推送**。
 
@@ -183,3 +184,10 @@ python3 run.py --backfill-months 3 --with-detail
 
 - 仅采集车质网公开投诉信息用于内部质量分析，不对外二次分发
 - 请求限速（1~2.5s 随机抖动）、指数退避、反爬熔断；源站响应波动大（实测 1~17s），请勿高频调用
+
+## 联系与交流
+
+如有问题、需求或合作意向，欢迎联系：
+
+- 📧 邮箱：13817447620@163.com
+- 💬 微信：13817447620
