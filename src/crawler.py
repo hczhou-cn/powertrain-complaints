@@ -31,7 +31,15 @@ class Crawler:
         self._circuit_breaker = 0
 
         self._session = requests.Session()
-        self._session.headers.update(settings["headers"])
+        headers = dict(settings["headers"])
+        # 强制短连接：避免代理/源站 keep-alive 死连接导致请求挂起（实测回填卡死根因）
+        headers.setdefault("Connection", "close")
+        self._session.headers.update(headers)
+        # 显式连接池配置，限制池大小，规避长时间运行时的连接堆积
+        adapter = requests.adapters.HTTPAdapter(
+            pool_connections=4, pool_maxsize=4, max_retries=0)
+        self._session.mount("https://", adapter)
+        self._session.mount("http://", adapter)
 
     # ---------- 基础抓取 ----------
 

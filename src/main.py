@@ -89,6 +89,9 @@ def scan_and_ingest(source, classifier, conn, args, settings) -> tuple[int, int,
             stopped_reason = "无新增投诉"
             break
         source.polite_sleep()
+        if page % 20 == 0:
+            logger.info("[翻页进度] 已扫描 %d 页，累计 %d 条，最新日期 %s",
+                        page, len(list_records), oldest)
 
     logger.info("[列表] 扫描 %d 页，共 %d 条投诉（停止原因: %s）",
                 page, len(list_records), stopped_reason or "达到页数上限")
