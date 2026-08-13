@@ -92,6 +92,17 @@ python3 run.py --notify
 
 日报卡片：统计窗口、动力总成投诉量/占比、子系统分布、TOP 5 品牌、**高风险问题清单**（自燃/失速/无法启动等，含"刹车失灵"关键词），有高风险时卡片红色告警。
 
+## 通知渠道（M3 + 扩展）
+
+| 渠道 | 格式 | 高风险样式 | Excel 报表 |
+|------|------|-----------|-----------|
+| 飞书 | interactive 卡片 | 红色告警模板 | ❌（自定义机器人不支持文件） |
+| 企微 | markdown 消息 | `<font color="warning">` 橙色警示 | ✅ 随日报自动推送 |
+
+- 环境变量 `FEISHU_WEBHOOK` / `WECOM_WEBHOOK` 优先级高于 `config/notify.json`
+- 企微推送 Excel：`config/notify.json` → `wecom.send_report: true`（文件 ≤20MB，media_id 有效期 3 天）
+- `--dry-run` 预览两种渠道的日报与文件推送
+
 ## 定时任务（macOS launchd / cron）
 
 每日 09:00 自动采集并推送，cron 示例：
