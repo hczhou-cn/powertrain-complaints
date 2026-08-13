@@ -272,6 +272,7 @@ def main(argv=None) -> int:
         conn, classifier, since_date, args, settings)
     print(f"\n[完成] CSV: {csv_path}\n[完成] Excel: {excel_path}")
 
+    dash_path = ""
     if args.dashboard:
         out_dir = cfg.resolve_path(settings["paths"]["output_dir"])
         dash_path = os.path.join(out_dir, f"dashboard_{datetime.now():%Y%m%d}.html")
@@ -281,10 +282,14 @@ def main(argv=None) -> int:
     if notifiers:
         for notifier in notifiers:
             notifier.send_daily(stats, since_date, high_risk, dry_run=args.dry_run)
-        # 企微渠道随日报推送 Excel 报表（飞书自定义机器人不支持文件消息）
+        # 企微渠道随日报推送产物文件（飞书自定义机器人不支持文件消息）
         for notifier in notifiers:
-            if isinstance(notifier, WeComNotifier) and notifier.send_report:
+            if not isinstance(notifier, WeComNotifier):
+                continue
+            if notifier.send_report:
                 notifier.send_file(excel_path, dry_run=args.dry_run)
+            if notifier.send_dashboard and dash_path:
+                notifier.send_file(dash_path, dry_run=args.dry_run)
     else:
         logger.info("通知渠道均未启用（enabled=false 或未配置 webhook）")
 

@@ -142,6 +142,7 @@ class WeComNotifier:
         self.webhook = _resolve_webhook("WECOM_WEBHOOK", wecom.get("webhook", ""))
         self.enabled = bool(wecom.get("enabled")) and bool(self.webhook)
         self.send_report = bool(wecom.get("send_report", False))  # 是否随日报推送 Excel 报表
+        self.send_dashboard = bool(wecom.get("send_dashboard", False))  # 是否随日报推送 HTML 看板
         self.report_title = wecom.get("report_title", "🚗 动力总成抱怨日报")
 
     def available(self, dry_run: bool = False) -> bool:
