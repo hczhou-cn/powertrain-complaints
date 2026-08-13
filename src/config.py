@@ -72,6 +72,7 @@ _DEFAULTS = {
         "wecom": {
             "webhook": "",
             "enabled": False,
+            "send_report": False,
             "report_title": "🚗 动力总成抱怨日报",
         },
     },

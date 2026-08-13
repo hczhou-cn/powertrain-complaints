@@ -281,6 +281,10 @@ def main(argv=None) -> int:
     if notifiers:
         for notifier in notifiers:
             notifier.send_daily(stats, since_date, high_risk, dry_run=args.dry_run)
+        # 企微渠道随日报推送 Excel 报表（飞书自定义机器人不支持文件消息）
+        for notifier in notifiers:
+            if isinstance(notifier, WeComNotifier) and notifier.send_report:
+                notifier.send_file(excel_path, dry_run=args.dry_run)
     else:
         logger.info("通知渠道均未启用（enabled=false 或未配置 webhook）")
 

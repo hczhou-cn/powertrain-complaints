@@ -141,6 +141,7 @@ class WeComNotifier:
         wecom = notify_cfg.get("wecom", {}) or {}
         self.webhook = _resolve_webhook("WECOM_WEBHOOK", wecom.get("webhook", ""))
         self.enabled = bool(wecom.get("enabled")) and bool(self.webhook)
+        self.send_report = bool(wecom.get("send_report", False))  # 是否随日报推送 Excel 报表
         self.report_title = wecom.get("report_title", "🚗 动力总成抱怨日报")
 
     def available(self, dry_run: bool = False) -> bool:
@@ -217,3 +218,56 @@ class WeComNotifier:
         """一站式发送日报。"""
         return self.send_message(self.build_daily_markdown(stats, since, high_risk),
                                  dry_run)
+
+    # ---------- Excel 报表文件推送 ----------
+
+    def _extract_key(self) -> str:
+        """从 webhook URL 提取 key 参数（上传文件接口需要）。"""
+        from urllib.parse import parse_qs, urlparse
+        return parse_qs(urlparse(self.webhook).query).get("key", [""])[0]
+
+    def upload_media(self, file_path: str) -> str | None:
+        """上传文件到企微，返回 media_id（文件 ≤ 20MB，media_id 有效期 3 天）。"""
+        key = self._extract_key()
+        url = ("https://qyapi.weixin.qq.com/cgi-bin/webhook/upload_media"
+               f"?key={key}&type=file")
+        try:
+            with open(file_path, "rb") as f:
+                resp = requests.post(
+                    url, files={"media": (os.path.basename(file_path), f)},
+                    timeout=30)
+            body = resp.json()
+            if resp.status_code == 200 and body.get("errcode") == 0:
+                logger.info("企微文件上传成功: %s", os.path.basename(file_path))
+                return body["media_id"]
+            logger.error("企微文件上传失败: %s %s", resp.status_code, body)
+            return None
+        except (requests.RequestException, OSError, ValueError) as exc:
+            logger.error("企微文件上传异常: %s", exc)
+            return None
+
+    def send_file(self, file_path: str, dry_run: bool = False) -> bool:
+        """发送 Excel 报表文件到企微群；dry_run 仅打印。"""
+        if not os.path.exists(file_path):
+            logger.warning("报表文件不存在，跳过推送: %s", file_path)
+            return False
+        if dry_run:
+            print(f"[dry-run] 企微发送报表文件: {file_path}")
+            return True
+        media_id = self.upload_media(file_path)
+        if not media_id:
+            return False
+        try:
+            resp = requests.post(self.webhook,
+                                 json={"msgtype": "file",
+                                       "file": {"media_id": media_id}},
+                                 timeout=10)
+            body = resp.json()
+            if resp.status_code == 200 and body.get("errcode") == 0:
+                logger.info("企微报表文件推送成功: %s", os.path.basename(file_path))
+                return True
+            logger.error("企微文件推送失败: %s %s", resp.status_code, body)
+            return False
+        except (requests.RequestException, ValueError) as exc:
+            logger.error("企微文件推送异常: %s", exc)
+            return False
