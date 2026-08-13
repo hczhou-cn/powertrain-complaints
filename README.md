@@ -94,10 +94,10 @@ python3 run.py --notify
 
 ## 通知渠道（M3 + 扩展）
 
-| 渠道 | 格式 | 高风险样式 | Excel 报表 |
-|------|------|-----------|-----------|
-| 飞书 | interactive 卡片 | 红色告警模板 | ❌（自定义机器人不支持文件） |
-| 企微 | markdown 消息 | `<font color="warning">` 橙色警示 | ✅ 随日报自动推送 |
+| 渠道 | 格式 | 高风险样式 | Excel 报表 | HTML 看板 |
+|------|------|-----------|-----------|----------|
+| 飞书 | interactive 卡片 | 红色告警模板 | ❌（自定义机器人不支持文件） | ❌ |
+| 企微 | markdown 消息 | `<font color="warning">` 橙色警示 | ✅ `send_report` | ✅ `send_dashboard` |
 
 - 环境变量 `FEISHU_WEBHOOK` / `WECOM_WEBHOOK` 优先级高于 `config/notify.json`
 - 企微推送 Excel：`config/notify.json` → `wecom.send_report: true`（文件 ≤20MB，media_id 有效期 3 天）
