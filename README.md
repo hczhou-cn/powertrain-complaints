@@ -1,6 +1,10 @@
 # 汽车动力总成抱怨采集分析系统（M2 工程化 + M3 报表）
 
-自动抓取**车质网**（12365auto.com）中国汽车投诉数据，双通道识别**动力总成（Powertrain）**相关抱怨，结构化入库（SQLite），输出 **CSV + Excel 多 Sheet 报表**，支持**飞书群机器人日报推送**。
+![Python](https://img.shields.io/badge/Python-3.10%2B-3776AB?logo=python&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green)
+![Platform](https://img.shields.io/badge/Platform-macOS%20%7C%20Linux-blue)
+
+自动抓取**车质网**（12365auto.com）中国汽车投诉数据，双通道识别**动力总成（Powertrain）**相关抱怨，结构化入库（SQLite），输出 **CSV + Excel 多 Sheet 报表 + HTML 看板**，支持**飞书 / 企微双渠道日报推送**。
 
 ## 目录结构
 
