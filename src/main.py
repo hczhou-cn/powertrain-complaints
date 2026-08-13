@@ -85,6 +85,7 @@ def scan_and_ingest(source, classifier, conn, args, settings) -> tuple[int, int,
             stopped_reason = "已覆盖回溯日期"
             break
         if not args.full and complete_nos and \
+                not args.backfill_months and \
                 all(r["complaint_no"] in complete_nos for r in records):
             stopped_reason = "无新增投诉"
             break
@@ -202,6 +203,8 @@ def main(argv=None) -> int:
                         help="生成单文件 HTML 网页看板")
     parser.add_argument("--source", default="",
                         help="数据源 id（默认 qczx；多源注册见 src/sources）")
+    parser.add_argument("--direct", action="store_true",
+                        help="直连模式：绕过本地代理（实测代理高频隧道易挂起，回填建议开启）")
     parser.add_argument("--reclassify", action="store_true",
                         help="仅重新识别库内近 N 天记录（不访问网络）")
     parser.add_argument("--report-only", action="store_true",
@@ -255,7 +258,7 @@ def main(argv=None) -> int:
         if source_cls is None:
             logger.error("未知数据源: %s（可用: %s）", args.source, list(SOURCES))
             return 1
-        source = source_cls(settings)
+        source = source_cls(settings, bypass_proxy=args.direct)
         new_count, detail_ok, detail_fail = scan_and_ingest(
             source, classifier, conn, args, settings)
         logger.info("[采集] 本次入库新增 %d 条（重复已跳过），详情成功 %d，失败 %d",

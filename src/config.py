@@ -22,7 +22,7 @@ _DEFAULTS = {
             "timeout_connect": 5, "timeout_read": 10,
             "delay_min": 1.0, "delay_max": 2.5,
             "max_retries": 2, "retry_backoff": [3, 6],
-            "circuit_break_threshold": 3,
+            "circuit_break_threshold": 3, "bypass_proxy": False,
         },
         "default_pages": 20,
         "default_days": 7,

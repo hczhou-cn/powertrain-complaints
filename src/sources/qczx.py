@@ -12,8 +12,8 @@ class QczxSource(ComplaintSource):
     id = "qczx"
     name = "车质网"
 
-    def __init__(self, settings: dict):
-        self.crawler = Crawler(settings)
+    def __init__(self, settings: dict, bypass_proxy: bool = False):
+        self.crawler = Crawler(settings, bypass_proxy=bypass_proxy)
         self.base_url = settings["base_list_url"]
 
     def fetch_list_page(self, page: int) -> str | None:
