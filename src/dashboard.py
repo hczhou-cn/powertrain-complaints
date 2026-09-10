@@ -37,6 +37,29 @@ window.PI_DATA = __DATA__;
   <!-- 指标卡 -->
   <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" id="metrics"></div>
 
+  <!-- 吉利集团专项监测 -->
+  <section id="geelySection" class="bg-gradient-to-r from-indigo-950 to-slate-900 text-white rounded-xl shadow p-5 mb-6">
+    <div class="flex flex-wrap items-center justify-between gap-2 mb-4">
+      <div>
+        <h2 class="text-lg font-bold">🎯 吉利集团专项监测</h2>
+        <p class="text-indigo-200 text-sm mt-1">重点关注：吉利银河、沃尔沃、领克、极氪及关联品牌</p>
+      </div>
+      <span class="text-xs bg-indigo-700 px-3 py-1 rounded-full">Powertrain Focus</span>
+    </div>
+    <div id="geelyMetrics" class="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4"></div>
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="bg-white/10 rounded-lg p-3">
+        <h3 class="text-sm text-indigo-100 mb-2">专项投诉趋势</h3>
+        <div id="chartGeelyTrend" class="h-56"></div>
+      </div>
+      <div class="bg-white/10 rounded-lg p-3">
+        <h3 class="text-sm text-indigo-100 mb-2">重点品牌分布</h3>
+        <div id="chartGeelyBrand" class="h-56"></div>
+      </div>
+    </div>
+    <div id="geelyRiskList" class="mt-4 space-y-2"></div>
+  </section>
+
   <!-- 图表区 -->
   <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
     <div class="bg-white rounded-xl shadow p-4">
@@ -92,6 +115,49 @@ window.PI_DATA = __DATA__;
 <script>
 const D = window.PI_DATA;
 document.getElementById("updateAt").textContent = "生成于 " + new Date().toLocaleString("zh-CN");
+
+// 吉利集团专项监测
+const geely = D.focus_groups && D.focus_groups.geely_group;
+const geelySection = document.getElementById("geelySection");
+if (!geely || geely.total === 0) {
+  geelySection.innerHTML = '<div><h2 class="text-lg font-bold">🎯 吉利集团专项监测</h2><p class="text-indigo-200 text-sm mt-2">当前窗口暂无吉利集团动力总成投诉</p></div>';
+} else {
+  const geelyMetricDefs = [
+    ["吉利集团投诉", geely.total],
+    ["占全部动力总成", (geely.ratio * 100).toFixed(1) + "%"],
+    ["涉及品牌", geely.brands.length],
+    ["高风险问题", geely.high_risk.length],
+  ];
+  const geelyBox = document.getElementById("geelyMetrics");
+  geelyMetricDefs.forEach(([label, value]) => {
+    geelyBox.innerHTML += `<div class="bg-white/15 rounded-lg p-3"><p class="text-xs text-indigo-200">${label}</p><p class="text-2xl font-bold mt-1">${value}</p></div>`;
+  });
+  const gt = echarts.init(document.getElementById("chartGeelyTrend"));
+  gt.setOption({
+    tooltip: { trigger: "axis" },
+    grid: { left: 36, right: 12, top: 18, bottom: 24 },
+    xAxis: { type: "category", data: geely.trend.map(r => r[0]), axisLabel: { color: "#c7d2fe" } },
+    yAxis: { type: "value", minInterval: 1, axisLabel: { color: "#c7d2fe" } },
+    series: [{ type: "line", smooth: true, data: geely.trend.map(r => r[1]),
+      lineStyle: { color: "#a5b4fc" }, itemStyle: { color: "#c4b5fd" }, areaStyle: { opacity: 0.2 } }]
+  });
+  const gb = echarts.init(document.getElementById("chartGeelyBrand"));
+  gb.setOption({
+    tooltip: {},
+    grid: { left: 86, right: 18, top: 12, bottom: 22 },
+    xAxis: { type: "value", minInterval: 1, axisLabel: { color: "#c7d2fe" } },
+    yAxis: { type: "category", data: geely.brands.map(r => r[0]).reverse(), axisLabel: { color: "#e0e7ff" } },
+    series: [{ type: "bar", data: geely.brands.map(r => r[1]).reverse(), itemStyle: { color: "#818cf8" }, barMaxWidth: 18 }]
+  });
+  window.addEventListener("resize", () => { gt.resize(); gb.resize(); });
+  const gr = document.getElementById("geelyRiskList");
+  if (geely.high_risk.length) {
+    gr.innerHTML = '<p class="text-amber-200 text-sm font-semibold">⚠ 吉利集团专项高风险问题</p>' + geely.high_risk.slice(0, 5).map(r =>
+      `<div class="bg-red-500/20 border border-red-300/30 rounded px-3 py-2 text-sm"><b>${r.brand} ${r.series}</b>：${r.title}<span class="text-amber-200 ml-2">${r.risk_keywords}</span></div>`).join("");
+  } else {
+    gr.innerHTML = '<p class="text-emerald-200 text-sm">✅ 当前窗口暂无吉利集团高风险问题</p>';
+  }
+}
 
 // 指标卡
 const metricDefs = [
@@ -212,6 +278,8 @@ render();
 
 def build_dashboard(conn, since: str, classifier, out_path: str) -> int:
     """生成看板 HTML，返回明细条数。"""
+    from .config import get_keywords
+    from .focus import build_focus_summary
     from .storage import fetch_detail, summary_stats
 
     stats = summary_stats(conn, since)
@@ -237,6 +305,8 @@ def build_dashboard(conn, since: str, classifier, out_path: str) -> int:
             "ratio": f"{stats['pt_total'] / stats['total'] * 100:.1f}%" if stats["total"] else "0%",
             "high_risk": len(high_risk),
         },
+        "focus_groups": build_focus_summary(
+            detail, get_keywords().get("focus_groups", {}), classifier),
         "trend": stats["trend"],
         "subsystem": stats["subsystem"],
         "brands": stats["brands"][:10],

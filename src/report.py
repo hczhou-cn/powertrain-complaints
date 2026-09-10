@@ -101,7 +101,8 @@ def export_csv(conn, since: str, out_path: str) -> int:
 
 
 def export_excel(conn, since: str, out_path: str, classifier=None,
-                 high_risk: list[dict] | None = None) -> int:
+                 high_risk: list[dict] | None = None,
+                 focus_summaries: dict | None = None) -> int:
     """生成多 Sheet Excel 报表，返回动力总成明细条数。"""
     from .storage import fetch_detail, summary_stats
 
@@ -162,7 +163,45 @@ def export_excel(conn, since: str, out_path: str, classifier=None,
                     hr_rows, wrap_col=3, fill_risk=True)
     _auto_width(ws)
 
-    # ---------- Sheet 2: 每日趋势 ----------
+    # ---------- 专项监测 Sheet ----------
+    for group_id, focus in (focus_summaries or {}).items():
+        sheet_name = "吉利集团专项" if group_id == "geely_group" else f"专项-{group_id}"[:31]
+        wsf = wb.create_sheet(sheet_name)
+        wsf.merge_cells("A1:F1")
+        wsf["A1"] = f"{focus['name']}动力总成专项监测（{since} ~ {today}）"
+        wsf["A1"].font = TITLE_FONT
+        wsf.row_dimensions[1].height = 28
+        focus_metrics = [
+            (f"{focus['name']}投诉数", focus["total"]),
+            ("占全部动力总成投诉", f"{focus['ratio'] * 100:.1f}%"),
+            ("涉及品牌数", len(focus["brands"])),
+            ("高风险问题数", len(focus["high_risk"])),
+        ]
+        for i, (label, value) in enumerate(focus_metrics):
+            wsf.cell(row=3 + i, column=1, value=label).font = SECTION_FONT
+            wsf.cell(row=3 + i, column=2, value=value)
+
+        wsf.cell(row=9, column=1, value="重点品牌").font = SECTION_FONT
+        write_table(wsf, 10, 1, ["品牌", "投诉数"], focus["brands"])
+        wsf.cell(row=9, column=4, value="重点车系").font = SECTION_FONT
+        write_table(wsf, 10, 4, ["车系", "投诉数"], focus["series"])
+
+        sub_start = 10 + max(len(focus["brands"]), len(focus["series"])) + 2
+        wsf.cell(row=sub_start, column=1, value="子系统分布").font = SECTION_FONT
+        write_table(wsf, sub_start + 1, 1, ["子系统", "投诉数"], focus["subsystems"])
+
+        if focus["high_risk"]:
+            risk_start = sub_start + len(focus["subsystems"]) + 4
+            wsf.cell(row=risk_start, column=1,
+                     value="⚠ 吉利集团高风险问题").font = SECTION_FONT
+            risk_rows = [[r["complaint_date"], r["brand"], r["series"], r["title"],
+                          r["risk_keywords"]] for r in focus["high_risk"][:20]]
+            write_table(wsf, risk_start + 1, 1,
+                        ["日期", "品牌", "车系", "问题简述", "命中词"],
+                        risk_rows, wrap_col=3, fill_risk=True)
+        _auto_width(wsf, max_w=50)
+
+    # ---------- Sheet: 每日趋势 ----------
     ws2 = wb.create_sheet("每日趋势")
     ws2.merge_cells("A1:C1")
     ws2["A1"] = "每日投诉量趋势"

@@ -64,6 +64,19 @@ _DEFAULTS = {
             "自燃", "起火", "爆炸", "热失控", "失速", "动力中断", "无法启动",
             "刹车失灵", "召回",
         ],
+        "focus_groups": {
+            "geely_group": {
+                "name": "吉利集团",
+                "description": "吉利汽车、吉利银河、沃尔沃、领克、极氪等重点品牌",
+                "aliases": [
+                    "吉利汽车", "吉利银河", "银河", "领克", "LYNK & CO", "LYNK&CO",
+                    "极氪", "ZEEKR", "沃尔沃", "VOLVO", "极星", "POLESTAR",
+                    "路特斯", "莲花汽车", "LOTUS", "smart", "smart精灵",
+                    "雷达汽车", "RADAR", "远程新能源商用车", "远程汽车",
+                    "宝腾", "PROTON", "LEVC",
+                ],
+            },
+        },
     },
     "notify": {
         "webhook": "",

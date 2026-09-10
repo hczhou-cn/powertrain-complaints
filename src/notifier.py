@@ -43,6 +43,24 @@ def _build_content_lines(stats: dict, since: str, high_risk: list[dict]) -> list
         lines.append("TOP 5 品牌：" + " / ".join(
             f"{b or '未知'}({c})" for b, c in brands[:5]))
 
+    # 重点集团专项提示（当前配置默认关注吉利集团）
+    for focus in (stats.get("focus_groups") or {}).values():
+        if not focus.get("total"):
+            continue
+        focus_brands = " / ".join(
+            f"{brand or '未知'}({count})" for brand, count in focus.get("brands", [])[:4])
+        lines.append("")
+        lines.append(
+            f"🔎 {focus.get('name', '重点集团')}专项：{focus['total']} 条，"
+            f"占动力总成 {focus.get('ratio', 0) * 100:.1f}%"
+        )
+        if focus_brands:
+            lines.append(f"· 重点品牌：{focus_brands}")
+        if focus.get("high_risk"):
+            lines.append(f"⚠ {focus.get('name', '重点集团')}专项高风险：{len(focus['high_risk'])} 条")
+            for item in focus["high_risk"][:3]:
+                lines.append(f"· {item['brand']} {item['series']}：{item['title'][:36]}")
+
     risk_lines = []
     for r in high_risk[:5]:
         risk_lines.append(f"· {r['complaint_date']} {r['brand']} {r['series']}"

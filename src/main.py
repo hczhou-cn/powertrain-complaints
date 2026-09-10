@@ -20,6 +20,7 @@ from datetime import datetime, timedelta
 from . import config as cfg
 from .classifier import PowertrainClassifier
 from .dashboard import build_dashboard
+from .focus import build_focus_summary
 from .notifier import FeishuNotifier, WeComNotifier
 from .report import export_csv, export_excel
 from .sources import SOURCES
@@ -165,17 +166,23 @@ def build_reports(conn, classifier, since_date, args, settings) -> tuple[str, st
     excel_path = os.path.join(out_dir, f"powertrain_report_{stamp}.xlsx")
 
     # 高风险记录（供报表标红与日报告警）
+    detail = fetch_detail(conn, since_date, is_pt=1)
     high_risk = []
-    for r in fetch_detail(conn, since_date, is_pt=1):
+    for r in detail:
         hits = classifier.high_risk_hits(r)
         if hits:
             r["risk_keywords"] = ",".join(hits)
             high_risk.append(r)
 
+    focus_summaries = build_focus_summary(
+        detail, cfg.get_keywords().get("focus_groups", {}), classifier)
+
     n_csv = export_csv(conn, since_date, csv_path)
-    n_excel = export_excel(conn, since_date, excel_path, classifier, high_risk)
+    n_excel = export_excel(conn, since_date, excel_path, classifier, high_risk,
+                           focus_summaries)
 
     stats = summary_stats(conn, since_date)
+    stats["focus_groups"] = focus_summaries
     pt = stats["pt_total"]
     total = stats["total"]
     logger.info("库视图统计（自 %s）: 投诉 %d 条，动力总成 %d 条（%.1f%%）",
