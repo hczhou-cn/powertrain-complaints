@@ -158,8 +158,8 @@ python3 run.py --backfill-months 3 --with-detail
 
 专项结果会同步出现在：
 
-- Excel：`吉利集团专项` Sheet
-- HTML 看板：`吉利集团专项监测` 专项区域
+- Excel：`吉利集团专项` Sheet，包含全部专项投诉明细，高风险行自动标红
+- HTML 看板：`吉利集团专项监测` 专项区域，展示全量明细，高风险问题突出显示
 - 飞书/企微日报：专项投诉量、重点品牌、专项高风险问题提示
 
 品牌别名配置位于 `config/keywords.json` 的 `focus_groups.geely_group.aliases`，调整后重新运行即可生效。

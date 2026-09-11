@@ -167,7 +167,7 @@ def export_excel(conn, since: str, out_path: str, classifier=None,
     for group_id, focus in (focus_summaries or {}).items():
         sheet_name = "吉利集团专项" if group_id == "geely_group" else f"专项-{group_id}"[:31]
         wsf = wb.create_sheet(sheet_name)
-        wsf.merge_cells("A1:F1")
+        wsf.merge_cells("A1:N1")
         wsf["A1"] = f"{focus['name']}动力总成专项监测（{since} ~ {today}）"
         wsf["A1"].font = TITLE_FONT
         wsf.row_dimensions[1].height = 28
@@ -190,15 +190,41 @@ def export_excel(conn, since: str, out_path: str, classifier=None,
         wsf.cell(row=sub_start, column=1, value="子系统分布").font = SECTION_FONT
         write_table(wsf, sub_start + 1, 1, ["子系统", "投诉数"], focus["subsystems"])
 
+        detail_start = sub_start + len(focus["subsystems"]) + 4
         if focus["high_risk"]:
-            risk_start = sub_start + len(focus["subsystems"]) + 4
+            risk_start = detail_start
             wsf.cell(row=risk_start, column=1,
-                     value="⚠ 吉利集团高风险问题").font = SECTION_FONT
+                     value=f"⚠ {focus['name']}高风险问题摘要").font = SECTION_FONT
             risk_rows = [[r["complaint_date"], r["brand"], r["series"], r["title"],
                           r["risk_keywords"]] for r in focus["high_risk"][:20]]
-            write_table(wsf, risk_start + 1, 1,
-                        ["日期", "品牌", "车系", "问题简述", "命中词"],
-                        risk_rows, wrap_col=3, fill_risk=True)
+            risk_end = write_table(wsf, risk_start + 1, 1,
+                                   ["日期", "品牌", "车系", "问题简述", "命中词"],
+                                   risk_rows, wrap_col=3, fill_risk=True)
+            detail_start = risk_end + 3
+
+        wsf.cell(row=detail_start, column=1,
+                 value=f"📋 {focus['name']}全部动力总成投诉明细（高风险问题已标红）").font = SECTION_FONT
+        detail_headers = ["投诉编号", "品牌", "车系", "车型", "问题简述", "典型问题代码",
+                          "投诉日期", "状态", "子系统", "识别通道", "命中关键词", "详情链接",
+                          "风险标记", "风险关键词"]
+        detail_rows = []
+        risk_nos = set()
+        for record in focus["records"]:
+            if record.get("high_risk"):
+                risk_nos.add(record["complaint_no"])
+            detail_rows.append([
+                record.get("complaint_no", ""), record.get("brand", ""),
+                record.get("series", ""), record.get("model", ""),
+                record.get("title", ""), record.get("issue_code", ""),
+                record.get("complaint_date", ""), record.get("status", ""),
+                record.get("pt_subsystem", ""), record.get("matched_by", ""),
+                record.get("matched_keywords", ""), record.get("detail_url", ""),
+                "高风险" if record.get("high_risk") else "",
+                record.get("risk_keywords", ""),
+            ])
+        write_table(wsf, detail_start + 1, 1, detail_headers, detail_rows,
+                    wrap_col=4, risk_rows=risk_nos)
+        wsf.freeze_panes = f"A{detail_start + 2}"
         _auto_width(wsf, max_w=50)
 
     # ---------- Sheet: 每日趋势 ----------

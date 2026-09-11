@@ -58,6 +58,27 @@ window.PI_DATA = __DATA__;
       </div>
     </div>
     <div id="geelyRiskList" class="mt-4 space-y-2"></div>
+    <div class="mt-5 bg-white rounded-lg p-3 text-slate-700">
+      <div class="flex items-center justify-between mb-2">
+        <h3 class="font-semibold">📋 吉利集团全部投诉明细（高风险问题已标红）</h3>
+        <span class="text-xs text-slate-500" id="geelyDetailCount">0 条</span>
+      </div>
+      <div class="overflow-x-auto max-h-96 overflow-y-auto">
+        <table class="w-full text-sm">
+          <thead class="sticky top-0 bg-slate-800 text-white">
+            <tr>
+              <th class="px-2 py-2 text-left">日期</th>
+              <th class="px-2 py-2 text-left">品牌</th>
+              <th class="px-2 py-2 text-left">车系</th>
+              <th class="px-2 py-2 text-left">问题简述</th>
+              <th class="px-2 py-2 text-left">子系统</th>
+              <th class="px-2 py-2 text-left">风险标记</th>
+            </tr>
+          </thead>
+          <tbody id="geelyDetailBody"></tbody>
+        </table>
+      </div>
+    </div>
   </section>
 
   <!-- 图表区 -->
@@ -157,6 +178,19 @@ if (!geely || geely.total === 0) {
   } else {
     gr.innerHTML = '<p class="text-emerald-200 text-sm">✅ 当前窗口暂无吉利集团高风险问题</p>';
   }
+
+  const geelyDetailBody = document.getElementById("geelyDetailBody");
+  const geelyRecords = geely.records || [];
+  geelyDetailBody.innerHTML = geelyRecords.map(r => `
+    <tr class="border-b hover:bg-indigo-50 ${r.high_risk ? "bg-red-50 border-l-4 border-red-500" : ""}">
+      <td class="px-2 py-1.5 whitespace-nowrap">${r.complaint_date || ""}</td>
+      <td class="px-2 py-1.5">${r.brand || ""}</td>
+      <td class="px-2 py-1.5">${r.series || ""}</td>
+      <td class="px-2 py-1.5">${r.title || ""}</td>
+      <td class="px-2 py-1.5">${r.pt_subsystem || "其他"}</td>
+      <td class="px-2 py-1.5">${r.high_risk ? `<span class="text-red-600 font-semibold">⚠ 高风险：${r.risk_keywords}</span>` : `<span class="text-slate-400">普通</span>`}</td>
+    </tr>`).join("");
+  document.getElementById("geelyDetailCount").textContent = geelyRecords.length + " 条";
 }
 
 // 指标卡

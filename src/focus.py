@@ -71,16 +71,21 @@ def build_focus_summary(records: list[dict], focus_groups: dict,
             trend_map[r.get("complaint_date", "未知日期")] += 1
 
         high_risk = []
-        for r in selected:
-            hits = classifier.high_risk_hits(r) if classifier else []
+        focus_records = []
+        for record in selected:
+            item = dict(record)
+            hits = classifier.high_risk_hits(item) if classifier else []
+            item["high_risk"] = bool(hits)
+            item["risk_keywords"] = ",".join(hits)
+            focus_records.append(item)
             if hits:
                 high_risk.append({
-                    "complaint_no": r.get("complaint_no", ""),
-                    "complaint_date": r.get("complaint_date", ""),
-                    "brand": r.get("brand", ""),
-                    "series": r.get("series", ""),
-                    "title": r.get("title", ""),
-                    "risk_keywords": ",".join(hits),
+                    "complaint_no": item.get("complaint_no", ""),
+                    "complaint_date": item.get("complaint_date", ""),
+                    "brand": item.get("brand", ""),
+                    "series": item.get("series", ""),
+                    "title": item.get("title", ""),
+                    "risk_keywords": item["risk_keywords"],
                 })
 
         summaries[group_id] = {
@@ -94,6 +99,6 @@ def build_focus_summary(records: list[dict], focus_groups: dict,
             "subsystems": [[k, v] for k, v in subsystem_counts.most_common()],
             "trend": [[k, trend_map[k]] for k in sorted(trend_map)],
             "high_risk": high_risk[:20],
-            "records": selected[:1000],
+            "records": focus_records[:1000],
         }
     return summaries
