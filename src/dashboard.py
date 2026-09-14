@@ -20,6 +20,11 @@ _DASHBOARD_TEMPLATE = """<!DOCTYPE html>
 <title>动力总成抱怨看板（__SINCE__ ~ __TODAY__）</title>
 <script src="https://cdn.tailwindcss.com"></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+  html, body { overflow-y: auto !important; height: auto !important; }
+  .geely-detail-scroll { overflow-x: auto; overflow-y: visible; max-height: none; }
+  .geely-detail-table { min-width: 860px; }
+</style>
 <script>
 window.PI_DATA = __DATA__;
 </script>
@@ -63,9 +68,9 @@ window.PI_DATA = __DATA__;
         <h3 class="font-semibold">📋 吉利集团全部投诉明细（高风险问题已标红）</h3>
         <span class="text-xs text-slate-500" id="geelyDetailCount">0 条</span>
       </div>
-      <div class="overflow-x-auto max-h-96 overflow-y-auto">
-        <table class="w-full text-sm">
-          <thead class="sticky top-0 bg-slate-800 text-white">
+      <div class="geely-detail-scroll">
+        <table class="geely-detail-table w-full text-sm">
+          <thead class="bg-slate-800 text-white">
             <tr>
               <th class="px-2 py-2 text-left">日期</th>
               <th class="px-2 py-2 text-left">品牌</th>

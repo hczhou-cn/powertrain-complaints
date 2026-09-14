@@ -233,10 +233,10 @@ class WeComNotifier:
 
         if high_risk:
             md.append("")
-            md.append('<font color="warning">数据来源：车质网公开投诉 | 详细清单见 Excel 报表</font>')
+            md.append('<font color="warning">数据来源：车质网公开投诉 | 详细清单见 Excel 报表 | HTML 看板建议使用浏览器打开</font>')
         else:
             md.append("")
-            md.append("数据来源：车质网公开投诉 | 详细清单见 Excel 报表")
+            md.append("数据来源：车质网公开投诉 | 详细清单见 Excel 报表 | HTML 看板建议使用浏览器打开")
         return "\n".join(md)
 
     def send_message(self, content: str, dry_run: bool = False) -> bool:
