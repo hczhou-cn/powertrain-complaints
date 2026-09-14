@@ -11,11 +11,50 @@
 import json
 import logging
 import os
+import time
 from datetime import datetime
 
 import requests
 
 logger = logging.getLogger(__name__)
+
+_RETRY_DELAYS = (1, 3, 8)
+
+
+def _post_json_with_retry(url: str, payload: dict, timeout: int,
+                          label: str) -> tuple[int | None, dict | None]:
+    """通知请求重试：先走系统网络，代理失败后自动切换直连。
+
+    不把 URL 写入日志，避免 webhook key 出现在日志文件中。
+    """
+    last_status = None
+    last_body = None
+    for attempt, delay in enumerate(_RETRY_DELAYS, 1):
+        for direct in (False, True):
+            try:
+                with requests.Session() as session:
+                    if direct:
+                        session.trust_env = False
+                    response = session.post(url, json=payload, timeout=timeout)
+                last_status = response.status_code
+                try:
+                    last_body = response.json()
+                except ValueError:
+                    last_body = {"text": response.text[:200]}
+                if response.status_code == 200:
+                    return last_status, last_body
+                logger.warning("%s返回 HTTP %s（第 %d/%d 次，直连=%s）: %s",
+                               label, response.status_code, attempt, len(_RETRY_DELAYS),
+                               direct, last_body)
+                if response.status_code not in (408, 429) and response.status_code < 500:
+                    return last_status, last_body
+            except requests.RequestException as exc:
+                logger.warning("%s连接失败（第 %d/%d 次，直连=%s）: %s",
+                               label, attempt, len(_RETRY_DELAYS), direct,
+                               type(exc).__name__)
+        if attempt < len(_RETRY_DELAYS):
+            time.sleep(delay)
+    return last_status, last_body
 
 
 def _build_content_lines(stats: dict, since: str, high_risk: list[dict]) -> list[str]:
@@ -128,19 +167,13 @@ class FeishuNotifier:
         if not self.webhook:
             logger.warning("未配置飞书 webhook，跳过推送")
             return False
-        try:
-            resp = requests.post(self.webhook, data=payload.encode("utf-8"),
-                                 headers={"Content-Type": "application/json"},
-                                 timeout=10)
-            body = resp.json()
-            if resp.status_code == 200 and body.get("code") == 0:
-                logger.info("飞书日报推送成功")
-                return True
-            logger.error("飞书推送失败: %s %s", resp.status_code, body)
-            return False
-        except (requests.RequestException, ValueError) as exc:
-            logger.error("飞书推送异常: %s", exc)
-            return False
+        status, body = _post_json_with_retry(
+            self.webhook, card, timeout=15, label="飞书日报")
+        if status == 200 and body and body.get("code") == 0:
+            logger.info("飞书日报推送成功")
+            return True
+        logger.error("飞书推送失败（HTTP %s）: %s", status, body)
+        return False
 
     def send_daily(self, stats: dict, since: str, high_risk: list[dict],
                    dry_run: bool = False) -> bool:
@@ -217,20 +250,17 @@ class WeComNotifier:
         if not self.webhook:
             logger.warning("未配置企微 webhook，跳过推送")
             return False
-        try:
-            resp = requests.post(self.webhook,
-                                 json={"msgtype": "markdown",
-                                       "markdown": {"content": content}},
-                                 timeout=10)
-            body = resp.json()
-            if resp.status_code == 200 and body.get("errcode") == 0:
-                logger.info("企微日报推送成功")
-                return True
-            logger.error("企微推送失败: %s %s", resp.status_code, body)
-            return False
-        except (requests.RequestException, ValueError) as exc:
-            logger.error("企微推送异常: %s", exc)
-            return False
+        status, body = _post_json_with_retry(
+            self.webhook,
+            {"msgtype": "markdown", "markdown": {"content": content}},
+            timeout=15,
+            label="企微日报",
+        )
+        if status == 200 and body and body.get("errcode") == 0:
+            logger.info("企微日报推送成功")
+            return True
+        logger.error("企微推送失败（HTTP %s）: %s", status, body)
+        return False
 
     def send_daily(self, stats: dict, since: str, high_risk: list[dict],
                    dry_run: bool = False) -> bool:
@@ -250,20 +280,34 @@ class WeComNotifier:
         key = self._extract_key()
         url = ("https://qyapi.weixin.qq.com/cgi-bin/webhook/upload_media"
                f"?key={key}&type=file")
-        try:
-            with open(file_path, "rb") as f:
-                resp = requests.post(
-                    url, files={"media": (os.path.basename(file_path), f)},
-                    timeout=30)
-            body = resp.json()
-            if resp.status_code == 200 and body.get("errcode") == 0:
-                logger.info("企微文件上传成功: %s", os.path.basename(file_path))
-                return body["media_id"]
-            logger.error("企微文件上传失败: %s %s", resp.status_code, body)
-            return None
-        except (requests.RequestException, OSError, ValueError) as exc:
-            logger.error("企微文件上传异常: %s", exc)
-            return None
+        for attempt, delay in enumerate(_RETRY_DELAYS, 1):
+            for direct in (False, True):
+                try:
+                    with requests.Session() as session:
+                        if direct:
+                            session.trust_env = False
+                        with open(file_path, "rb") as f:
+                            resp = session.post(
+                                url, files={"media": (os.path.basename(file_path), f)},
+                                timeout=30)
+                    body = resp.json()
+                    if resp.status_code == 200 and body.get("errcode") == 0:
+                        logger.info("企微文件上传成功: %s", os.path.basename(file_path))
+                        return body["media_id"]
+                    logger.warning("企微文件上传失败（HTTP %s，第 %d/%d 次，直连=%s）: %s",
+                                   resp.status_code, attempt, len(_RETRY_DELAYS), direct, body)
+                    if resp.status_code not in (408, 429) and resp.status_code < 500:
+                        return None
+                except requests.RequestException as exc:
+                    logger.warning("企微文件上传连接失败（第 %d/%d 次，直连=%s）: %s",
+                                   attempt, len(_RETRY_DELAYS), direct, type(exc).__name__)
+                except (OSError, ValueError) as exc:
+                    logger.error("企微文件上传异常（%s）: %s", type(exc).__name__, exc)
+                    return None
+            if attempt < len(_RETRY_DELAYS):
+                time.sleep(delay)
+        logger.error("企微文件上传最终失败: %s", os.path.basename(file_path))
+        return None
 
     def send_file(self, file_path: str, dry_run: bool = False) -> bool:
         """发送 Excel 报表文件到企微群；dry_run 仅打印。"""
@@ -276,17 +320,14 @@ class WeComNotifier:
         media_id = self.upload_media(file_path)
         if not media_id:
             return False
-        try:
-            resp = requests.post(self.webhook,
-                                 json={"msgtype": "file",
-                                       "file": {"media_id": media_id}},
-                                 timeout=10)
-            body = resp.json()
-            if resp.status_code == 200 and body.get("errcode") == 0:
-                logger.info("企微报表文件推送成功: %s", os.path.basename(file_path))
-                return True
-            logger.error("企微文件推送失败: %s %s", resp.status_code, body)
-            return False
-        except (requests.RequestException, ValueError) as exc:
-            logger.error("企微文件推送异常: %s", exc)
-            return False
+        status, body = _post_json_with_retry(
+            self.webhook,
+            {"msgtype": "file", "file": {"media_id": media_id}},
+            timeout=15,
+            label="企微文件推送",
+        )
+        if status == 200 and body and body.get("errcode") == 0:
+            logger.info("企微报表文件推送成功: %s", os.path.basename(file_path))
+            return True
+        logger.error("企微文件推送失败（HTTP %s）: %s", status, body)
+        return False

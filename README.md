@@ -24,8 +24,12 @@ powertrain-complaints/
 │   ├── classifier.py           #   识别层（双通道规则引擎）
 │   ├── storage.py              #   存储层（SQLite 幂等入库 + 报表查询）
 │   ├── report.py               #   输出层（CSV + Excel 报表）
-│   ├── notifier.py             #   通知层（飞书日报卡片）
+│   ├── notifier.py             #   通知层（飞书/企微，重试+代理直连兜底）
+│   ├── focus.py                #   吉利集团专项识别与聚合
 │   └── config.py               #   配置加载（默认值兜底）
+├── scripts/
+│   ├── install_mac_launchd.sh  #   安装 macOS 稳定定时任务
+│   └── run_scheduled.sh        #   定时任务失败自动重试
 ├── data/complaints.db          # SQLite 数据库（自动创建，勿提交）
 ├── output/reports/             # CSV + Excel 报表（自动生成）
 └── logs/collect.log            # 轮转日志（自动生成）
@@ -70,13 +74,13 @@ python3 run.py --notify
 | `--no-detail` | 不抓详情页正文（快速模式） |
 | `--reclassify` | 仅重打标库内记录（改规则后用） |
 | `--report-only` | 仅生成报表与推送，不采集 |
-| `--notify` / `--no-notify` | 覆盖飞书推送开关 |
-| `--dry-run` | 飞书推送仅打印 payload |
+| `--notify` / `--no-notify` | 覆盖飞书/企微推送开关 |
+| `--dry-run` | 飞书/企微推送仅打印 payload，不实际发送 |
 | `--verbose` | DEBUG 日志 |
 
 ## Excel 报表（M3）
 
-`output/reports/powertrain_report_YYYYMMDD.xlsx`，6 个 Sheet：
+`output/reports/powertrain_report_YYYYMMDD.xlsx`，7 个 Sheet：
 
 | Sheet | 内容 |
 |-------|------|
@@ -85,6 +89,7 @@ python3 run.py --notify
 | 品牌排行 | 品牌投诉数与占比 |
 | 车系排行 | 车系投诉数 TOP 50 |
 | 子系统分布 | 子系统数量与占比 |
+| 吉利集团专项 | 吉利集团专项指标、品牌/车系分析、全部专项明细，**高风险行标红** |
 | 投诉明细 | 全字段清单，**高风险投诉行标红** |
 
 ## 飞书日报（M3）
@@ -108,15 +113,26 @@ python3 run.py --notify
 - 企微推送 Excel：`config/notify.json` → `wecom.send_report: true`（文件 ≤20MB，media_id 有效期 3 天）
 - `--dry-run` 预览两种渠道的日报与文件推送
 
-## 定时任务（macOS launchd / cron）
+## 定时任务（macOS launchd）
 
-每日 09:00 自动采集并推送，cron 示例：
+macOS 推荐使用项目自带的 launchd 方案，每天 09:00 自动采集、生成报表并推送。电脑睡眠错过时间后，唤醒时会补跑；网络或通知失败时，任务包装器最多自动重试 3 次。
 
 ```bash
-0 9 * * * cd /Users/zhouhaocheng/powertrain-complaints && /opt/anaconda3/bin/python3 run.py --notify >> logs/cron.log 2>&1
+cd /Users/zhouhaocheng/powertrain-complaints
+chmod +x scripts/*.sh
+./scripts/install_mac_launchd.sh
 ```
 
-程序幂等：重复运行不产生脏数据；日常运行第一页即停（无新增时仅 1-2 个请求）。
+检查和立即测试：
+
+```bash
+launchctl print gui/$(id -u)/com.hczhou.powertrain-complaints
+launchctl kickstart -k gui/$(id -u)/com.hczhou.powertrain-complaints
+```
+
+程序幂等：重复运行不产生脏数据；通知请求会在系统代理失败后自动尝试直连。
+
+旧 cron 任务应删除，避免同一时间重复采集和重复推送。
 
 ## 网页看板（M4）
 
@@ -176,8 +192,10 @@ python3 run.py --backfill-months 3 --with-detail
 
 ```
 列表页扫描（增量停止） → 初筛候选（代码/标题双信号） → 详情页正文补全（缺正文才抓）
-→ 双通道识别 + 子系统打标 → SQLite 幂等入库 → CSV + Excel 报表 → 飞书日报
+→ 双通道识别 + 子系统打标 → SQLite 幂等入库 → CSV + Excel 报表 → 飞书/企微日报
 ```
+
+通知具备三层可靠性保障：请求超时与多次重试、系统代理失败后自动直连、通知失败时返回非零状态供调度器识别。macOS 使用 launchd 调度，任务失败后包装器会自动重跑。
 
 ### 工程特性（M2）
 

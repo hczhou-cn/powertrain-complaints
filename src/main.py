@@ -286,22 +286,35 @@ def main(argv=None) -> int:
         build_dashboard(conn, since_date, classifier, dash_path)
         print(f"[完成] 看板: {dash_path}（浏览器打开）")
 
+    notification_failures = 0
     if notifiers:
         for notifier in notifiers:
-            notifier.send_daily(stats, since_date, high_risk, dry_run=args.dry_run)
+            if not notifier.send_daily(stats, since_date, high_risk,
+                                       dry_run=args.dry_run):
+                notification_failures += 1
         # 企微渠道随日报推送产物文件（飞书自定义机器人不支持文件消息）
         for notifier in notifiers:
             if not isinstance(notifier, WeComNotifier):
                 continue
-            if notifier.send_report:
-                notifier.send_file(excel_path, dry_run=args.dry_run)
-            if notifier.send_dashboard and dash_path:
-                notifier.send_file(dash_path, dry_run=args.dry_run)
+            if notifier.send_report and not notifier.send_file(
+                    excel_path, dry_run=args.dry_run):
+                notification_failures += 1
+            if notifier.send_dashboard and dash_path and not notifier.send_file(
+                    dash_path, dry_run=args.dry_run):
+                notification_failures += 1
+        if notification_failures:
+            logger.error("[通知] 失败 %d 项；任务返回失败状态，调度器将按策略重试",
+                         notification_failures)
+        else:
+            logger.info("[通知] 所有已启用渠道推送成功（%d 项）", len(notifiers))
+    elif args.notify:
+        logger.error("[通知] --notify 已启用，但没有可用通知渠道，请检查 webhook 和 enabled")
+        notification_failures = 1
     else:
         logger.info("通知渠道均未启用（enabled=false 或未配置 webhook）")
 
     conn.close()
-    return 0
+    return 2 if notification_failures else 0
 
 
 if __name__ == "__main__":
